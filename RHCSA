@@ -1,0 +1,465 @@
+1. cracking the room passwd
+
+Chapter 9.8 practice: resetting a lost root password
+
+change the root passwd to root1234
+-  Press e
+- rd.break
+- mount -o remount, rw /sysroot
+- chroot /sysroot
+- passwd root
+- touch /.autorelabel
+- exit twice
+
+
+2. configure the primary network interface with hostname example.com (alias rhcsa1). IP address 192.168.4.251/24, gateway 192.168.4.2, and namae server 192.168.4.200. You may use different IP assignment
+
+chapter 10 lab
+Examing network configuration
+-  ip addr
+- ip -s link show eth0
+- ip route
+- ping 172..25.1.254 ( verify that the router is accessible)
+- tracepath classroom.example.com
+- ss -lt
+
+
+- nmcli con show (“System eth0”)
+- nmcli dev status
+- nmcli dev show eth0
+
+cmcli connection
+nmcli connection delete “System eth0” (no network)
+
+- nmcli con add con-name “system eth0” ifname eth0 type ethernet autoconnect yes ip4 191.168.4.251/24 gw4 192.168.4.2
+
+- nmcli con mod “System eth0” ipv4.dns 192.168.4.200
+- nmlci con show
+- nmcli con show –active
+-  nmcli con up “System eth0”
+
+- ip a (to test)
+
+Test the connectivity:
+- ip addr show eth0   - veryfy IP
+-  ip route  (verify default gateway)
+- ping 192.168.4.2 (ping the DNS address
+- cat //etc/sysconfig/network-scripts/ifcfg-System_eth0
+- host hostname (classroom.example.com)
+and 
+- host <ip_addr> should return the hostname
+
+3. Set the default boot target to multiuser
+
+- systemctl get-default
+- sudo systemctl set-default multi-user.target
+- sudo systemctl set-default graphical.target
+
+
+4. set Selinux to enforcing mode
+
+- get tab-tab to get a list of command starting with “get”
+- getenforce
+- cat //etc/selinux/config
+ - edit the config file and change it to “Enforcing”
+getand reboot
+
+5. create the following user,group and group memberships:
+A Group named sysgrp
+A user andrew who belongs to sysgrp as a secondary group
+A user susan also belongs to sysgrp as a secondary group
+o A user sarah who does not have access to an interactive
+system and who not a member of sysgrp
+Andrew, susan and sarah password=”postroll”
+
+-  groupadd sysgrp
+- useradd andrew
+- useradd susan
+-  usermod -aG sysgrp andrew
+- usermod -aG sysgrp susan
+- useradd -s //sbin/nologin sarah
+- passwd andrew (susan, sarah)
+
+Verification
+id andrew
+id susan
+su – sarah
+
+
+6 create a collaborative directory /redhat/sysgrp with the following characteristics:
+	–> Group owneship of /redhat/sysgrpis sysgrp
+	–> The directory should be readbale,writable, and accessable to members of 	sysgrp,
+	but not to any other user.
+	(It is understood that root has access to all files and directories on the 	system.
+	–> Files created in /redhat/sysgrp automatically have group ownership set to 	the sysgrp group
+
+-  mkdir -p redhatsysgrp
+-groupadd sysgrp
+- chgrp sysgrp //redhat/sysgrp |or
+- chown :sysgrp //redhat/sysgrp
+- chmod 2770 //redhat/sysgrp   //Set the setgid bit, and read/write/execute for user and group on directory:
+  Add the setgid bit on directory:
+  chmod g+s directory
+
+verification:
+ls -ld //redhat/sysgrp
+
+7 Enable IP forwarding on your machine
+
+- vim /etc/sysctl.conf
+   add net.ipv4.ip_forward = 1
+- Enable it using:
+   sysctl -p
+
+
+8 copy the file /etc/fstab to /var/tmp
+configure the permission of /var/tmp/fstab so that
+the file /var/tmp/fstab is owned by the root user, belongs to the group root
+should not be executable by anyone.
+The user andrew is able to read & write /var/tmp/fstab
+The user susan can neighter write nor read /var/tmp/fstab
+All other users (current or future) have the ability to read /var/tmp/fstab.
+
+- cp /etc/fstab //var/tmp/fstab
+- chown root:root /var/tmp/fstab
+- setfacl -m u:andrew:rw- /var/tmp/fstab
+- setfacl -m u:suan:--- /var/tmp/fstab
+
+to verify:
+
+- getfacl /var/tmp/fstab
+- su - andrew and try to write to /var/tmp/fstab e.g. echo "#test" >> /var/tmp/fstab
+- su - susan and try to write to the file and it should fail
+
+9 Add the user talusan with userid 2985
+
+- useradd -u 1985 talusan
+to verify
+- id talusan
+
+10. find the file which owned by user julice and copy the file into /root/findresults directory.
+
+- mkdir /root/findresults
+- find / -user julice -exec cp -rfp {} /root/findresults/ \;
+
+11. create an archive file /root/local.tgz for /usr/local. it should be compressed by gzip.
+
+- tar -cvzf /root/local.tgz /usr/local
+
+12. Search the string sarah in the /etc/passwd file and save the output in /root/lines
+
+- grep sarah /etc/passwd > /root/lines
+- cat /root/lines
+ 
+13. create a new 100MB Physical partition mounted under /gluster
+(Note because partition sizes are seldom exactly what is specified when they are created, 
+any thing within the range of 70MB to 120MB is acceptable)
+
+-fdisk /dev/vdb ----- > Create the Partition of 100M
+  partx /dev/vdb
+- mkfs.ext4 /dev/vdb2 ------> Make a filesystem on it
+- mkdir -p /gluster -----> Create Directory to mount on it
+- blkid ------> Get the UUID of it
+- vim /etc/fstab --------> Create the mount point inside the fstab
+
+   UUID=c3ac5a96-80a9-44c3-b51e-9531e9ed9f08 /gluster ext4 defaults 0 0
+
+- mount -a ------> Mount it
+- df -hT ----> verify it is mounted 
+
+
+14. create a new 150MB swap partition f/s.
+(Note because partition sizes are seldom exactly what is specified when they are created,
+any thing within the range of 130MB to 170MB is acceptable)
+
+- free -m
+-fdisk -l
+- fdisk /dev/vdb (t=82)
+- partprobe
+- mkswap /dev/vdb2
+- swapon /dev/vdb2
+- vim /etc/fstab  (uuid swap swap defaults 0 0)
+- swapon -a
+- free -m
+-
+   
+15. create a repositary for http://content.example.com/rhel7.0/x86_64/dvd
+Chapter 7 -Enabling yum software repository
+
+
+- vim /etc/yum.repos.d/myrepo.repo
+	[short-name]
+	name = Local Repo for RHCSA exam
+	baseurl = http://content.example.com/rhel7.0/x86_64/dvd
+	gpgcheck = 0
+	enabled = 1
+Test:
+
+- yum clean all
+- yum list all
+- yum repolist
+
+
+16. Install the appropriate kernel update from http://content.example.com/rhel7.0/x86_64/errata
+The following criteria must also be met:
+–>The updated kernel is the default kerneal when the system rebooted. (do yum install kernel and NOT yum update, HOWEVER, kernel update is a install anyways, so it does not matter in the case of kernel)
+–>The original kernel remains available and bootable on the system
+
+# we can add the repo use: yum-config-manager --add-repo=”http://content.example.com/rhel7.0/x86_64/errata”
+# then modify the repo by edting the //etc/yum.repos.d/*.repo file 
+  add gpgcheck=0
+# we can disable the other repos using
+- yum-config-manager –-disable <repo id>
+
+- vim /etc/yum.repos.d/rhcsa.repo
+
+	[kernelrepo]
+	name = Local Repo for Kernel
+	baseurl = [url="http://content.example.com/rhel7.0/x86_64/errata"]http://content.example.com/rhel7.0/x86_64/errata[/url]
+	gpgcheck = 0
+	enabled = 1
+	 
+- yum repolist
+
+Run this command before installing the kernel
+- yum list kernel
+- uname -rms
+	Linux 3.10.0-123.el7.x86_64 x86_64
+Install the kernel
+- yum install kernel
+
+After Kernel installation, reboot the system and run this command again
+- yum list kernel
+- uname -rms
+Linux 3.10.0-123.1.2.el7.x86_64 x86_64
+
+17. Bind with LDAP used provided by classroom.example.com for userr authentication.
+Note the following:-
+–> The LDAP search base DN is dc=example,dc=com
+–> The LDAP certificate file is
+http://classroom.example.com/pub/EXAMPLE-CA-CERT
+–>ldapuserX should be able to log into your system, whereX is your ServerX ((hint:where X is your domain number),
+but will not have a home directory, until you have completed the autofs requirement,below all LDAP users have password of “password”
+
+Chapter 3 – using Identity Management service
+
+-  yum install authconfig-gtk sssd krb5-workstation
+- yum install auth* -y
+- yum install sssd* -y
+- authconfig-gtk
+	selecdt LDAP
+	DN: dc=example,dc=com
+	server: ldap://classroom.example.com (just starting from clasroom. Is fine)
+	choose TLS
+	click on 'download CA certificate
+	link: http://classroom.example.com/pub/EXAMPLE-CA-CERT (lower case is ok)
+	authentication MethodL LADP password
+
+if use Kerberos password
+- Realm is EXAMPLE.COM (USE CAP LETTER)
+- kdcS: classroom.example.com
+- admin server: classroom.example.com
+
+On Advance options- check create home directoryies on first login
+
+	apply
+- systemctl enable sssd.service
+- systemctl start sssd.service
+
+Verification:
+- getent passewd ldapuser0
+(should get some output)
+ 
+18. configure autofs to automount the home directories of LDAP users,
+Note the following:
+–>classroom.example.com (172.25.254.254), NFS-exports /home/guests to your system, whereX is your server Number.
+–>LDAP userX’s home directory is classroom.example.com:/home/guests/ldapuserX
+–>LdapuserX’s home directory should be automounted locally beneath /home as /home/guests/ldapuserX
+–>home directories must be writable by their users
+–>while you are able to login as any of the users ldapuser1 through ldapuser20 the only home directory that is accessible from
+your system is ldapuserX.
+Example:- classroom.example.com would configure the automaster such that ldapuser100’s home directory /home/guests/ldapuserX gets mounted automatically upon login. The NFS share would be classroom.example.com:/home/guests/ldapuser100
+
+- yum install autofs
+- vim /etc/auto.master.d/home.autofs
+	/home/guests /etc/auto.home
+- vim /etc/auto.home
+	ldapuser9 -rw,sync classroom.example.com:/home/guests/&
+- systemctl enable autofs.service
+- systemctl start autofs.service
+
+Verification:
+- ssh ldapuser9@localhost
+- df -h
+
+19. Configure your system so that it is an NTP client of classroom.example.com
+
+- yum install chrony
+- vim /etc/chrony.conf
+	# comment out allother servers
+	server classroom.example.com iburst
+
+- systemctl restart chronyd
+- systemctl enable chronyd
+
+Verification:
+- chronyc sources -V --> to check the reach level
+
+20. create a new physical volume, create a new volume group in the name of datacontainer, vg extent is 16.00MB
+create a new logical volume in the name of datacopy with the size of 50 extents and file system must vfat then
+mount it under /datasource
+
+- fdisk /dev/vdb ----- > Create the Partition of 802M[ (16*50) + 2 ] and set it's type 8e (which is LVM type)
+- partx /dev/vdb --- If you didn't get the partition, just reboot the system, don't get panic
+- pvcreate /dev/vdb5
+- vgcreate -s 16M datacontainer /dev/vdb5
+- vgdisplay -----> Check the vg extent size, its should be this (PE Size 16.00 MiB)
+- lvcreate -l 50 -n datacopy datacontainer
+- lvdisplay ------------> Check the size of extents and it should be(Current LE 50)
+- mkfs.vfat /dev/datacontainer/datacopy ------> Make a filesystem on it
+
+- mkdir -p /gluster -----> Create Directory to mount on it
+- blkid /dev/datacontainer/datacopy -----> get the UUID of /dev/datacontainer/datacopy
+- vim /etc/fstab --------> Create the mount point inside the fstab
+	UUID=C553-2BF5 /datasource vfat defaults 0 0
+
+- mount -a
+
+Verification:
+- df -hT ----> verify it is mounted
+
+21. Resize the logical volume, logical-data and it filesystem to 400MB.
+Make sure that the filesystem contents remain intact.
+(Note: partitions are seldom exactly  the size requested,so any thing within the range of 370MB to 430MB is acceptable)
+
+df -Th -------> get the mount point of it
+ 
+- umount /datasource
+- e2fsck -f /dev/datacontainer/datacopy
+- lvreduce -L 400M /dev/datacontainer/datacopy
+- mount -a
+Verify:
+- lvdisplay
+
+22. The user andrew must configure a cron job that runs daily at 14:23 local time and executes – /bin/echo hiya
+
+yum install cronie
+
+systemctl enable crond
+systemctl start crond
+crontab -eu andrew
+
+23 14 * * * /bin/echo hiya
+
+Verification:
+crontab -lu andrew
+
+23. activate and start firewalld
+- systemctl start firewalld
+- systemctl enable firewalld
+- systemctl status firewalld
+
+24. set the primary command prompt for user root to display the hostname, username, and current working diretory informaton in that order
+
+-vim /etc/bashc (copy the line ["$PS1" = )
+- cd root and vim .bashrc (and paste the line in this file)
+  and change it to PS1="[\h@\u \w]\\$ "
+
+25. Create users sam, tom, steve, bob, and anna with home directiories in /home. 
+set their passwords to user123 and 
+make accounts for sam and tom expire on June 30, 2019 
+User steve and bob should have their secondary groups set to group tech (create this group if does not exist)
+
+- useradd sam ...
+- passwd sam
+- chage -E 2019-06-30 sam
+- chage -l sam (to verify)
+- tail /etc/group (to check if tech group exist)
+- groupadd tech
+- usermod -aG tech steve
+- id steve (to verify)
+
+26. Create a directory called dir1 as user anna in her home directory and 
+set default ACLs on it for user sam for read and write access
+
+
+- su anna
+- mkdir dir1
+- setfacl -m u:sam:rx /home/anna
+- setfacl -m u:sam:rwx /home/anna/dir1
+- su sam and touch a file
+
+27. set up a local repo for the remote FTP yum repository in the /pub/ directory on S1
+( the IP address for the S1 server is 192.168.0.120)
+
+
+ 28. Change the current hostname to cl.home.local
+Chapter 10 – Configuring hostname and name resolution
+
+- hostnamectl set-hostname cl.home.local
+- hostnamectl status
+- cat //etc/hostname
+
+- cat //etc/resolv.conf (to see what dns settings are)
+
+- getent hosts hostname  - to test host name resolution
+
+29. set the default target to boot into graphical.atrget
+- systemctl get-default (to check)
+- systemctl set-default graphical.target
+
+
+30. Install the ftp package and allow it to get document stored on CIFS mounted directories
+
+- yum install -y vsftpd
+- yum install -y setroubleshoot
+- semanage boolean -l |grep ftp |grep cifs
+- semanage boolean -m -1 ftp_use_cifs
+
+31. Extended the existing root file system with an addtitional size of 1 GB
+- fdisk -l
+- fdisk /dev/vdb1
+- partprobe
+- vgextend vg_name /dev/vdb1
+- lvextend /dev/vg_name/root -L +1G
+- xfs_growfs /dev/vg_name/root
+
+32. Assign the same SELinux contexts that are used by the user's home directories to the /dir1 directory
+
+- mkdir /dir1
+- semange fcontext -a -t home_root_t /dir1
+- restorecon -v /dir1/
+
+to test:
+- touch /dir1/test
+- ls -Z /dir1/test
+
+33. create suer ahmed with uid 1100, ahmed account expire 9 months from the date you create the account.
+create another user rabah with uid 1200 and with cshel login shell. both users passwd must be P@ss
+
+- useradd -u 1100 ahmed
+- useradd -u 1200 -s /bin/csh rabah
+- passwd ahmed
+- date -d "9 month" +%Y-%m-%d
+- chage -E 2019-10-01 ahmed
+- chage -l 
+
+34. Create a directory name /admins. allow ahmed and rabah to share documents in the /admins directory 
+using a group named admins. Both users can read write, users that are not member of the admins group cannot access the directory
+
+- mkdir /admins
+- groupadd admins
+- usermod -aG admins ahmed
+- usermod -aG admins rabah
+- chgrp admins /admins
+- chmod 2770 /admins
+
+35. Create a cron job as root user that delete empty files and directory from /tmp at 00:30 am daily
+
+- crontab -e
+	30 00 * * * //bin/find /tmp -empty -delete 
+- crontab -l
+
+36. Allow Ahmed to get full access to rabah home directory
+- setfacl -m u:ahmed:rwx /home/rabah
+- getfacl //homer/abah
