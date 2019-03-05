@@ -1,0 +1,107 @@
+Notes:
+to use GUI
+systemctl set-default graphical.target
+
+on VM:
+ssh -Y root@vm
+export DISPLAY=”DISPLAY="127.0.0.1:10.0"
+Then try firewall-config should start the GUI
+
+Also, I found one more bit of super useful notes, as well.  Try your best to memorize this, (practice practice practice) because it likely results in a decent portion of the points you'll receive on the test and it's super easy to get these out of the way.
+The following notes are all of the packages you will need to install on the server and the client sides, all of the services needed to start and enable, and the firewall settings needed.  This was all gathered from going through each of the practices above and just writing down what was needed to run them successfully.  For the packages to install and services to start/enable, you can definitely install multiple packages in a row like this, there is no need to run "yum install <package>" for each one.  The formatting below should be accurate.
+
+~~~
+Packages to Install:
+Server - 
+yum groupinstall   (3)
+	web-server 
+	mariadb 
+	mariadb-client; 
+yum install (13)
+	unbound 
+	postfix 	(email services)
+	targetcli  (Isci storage)
+	nfs-utils 
+	samba* 
+	samba-client 
+	authconfig-gtk 
+	sssd 
+	openssh*
+	krb5-workstation 
+	mod-wsgi 
+	php 
+	php-mysql
+
+
+
+
+
+
+
+
+Client - 
+yum install (7)
+	iscsi-initiator-utils 
+	samba-client 
+	cifs-utils 
+	authconfig-gtk 
+	sssd 
+	krb5-workstation 
+	mariadb-client
+
+Start/Enable Services:
+
+Server - 
+
+systemctl start (14)
+	sshd (ssh access)
+	NetworkManager (network teaming)
+	unbound  (caching Nameserver - DNS)
+	firewalld 
+	httpd (web-server)
+	iscsi (Isci initiator)
+	iscsid (Isci initiator)
+	postfix (email services)
+	target  (Isci storage)
+	mariadb 
+	nfs-secure-server 
+	nfs-server 
+	smb 
+	nmb (also run 'systemctl enable' for all of these)
+
+Client - 
+
+systemctl start (3)
+	iscsi (Isci initiator)
+	iscsid (Isci initiator)
+	nfs-secure 
+(also run 'systemctl enable' for all of these)
+
+Firewall settings - use the GUI (way easier than memorizing the CLI commands) firewall-config and enable the following services and ports for Permanent...don't forget to restart the firewalld service after:
+- Applications > Sundry > Firewall (or firewall-config)
+- choose permananet configration
+- after change settings, reload filewalld : options→ Reload Firewalld
+
+Server
+  - Services: dns ssh http https nfs rpc-bind mountd samba mysql smtp   (10)
+  - Ports: 3260/tcp
+                 8909/tcp
+Client
+  - no configuration needed
+
+From the lab:
+Important: Also add a checkmark in front of the vnc-server service. Failing to
+do so will lock out your graphical interface when you activate the firewall. If you do
+accidentally lock yourself out, recover by using ssh -X serverX firewall-config
+from your desktopX machine.
+Just in case you need it
+change the root passwd to root1234
+-  Press e
+- rd.break
+- mount -o remount, rw /sysroot
+- chroot /sysroot
+- passwd root
+- touch /.autorelabel
+- exit twice
+
+
