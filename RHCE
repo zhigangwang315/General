@@ -104,4 +104,16 @@ change the root passwd to root1234
 - touch /.autorelabel
 - exit twice
 
+Qsn16.
+Configure your system to use a default repository:-
+A yum repository has been provided at
+http://server1.net13.example.com//rhel
+
+Ans:-
+#vim /etc/yum.repos.d/server.repo
+[server]
+name = Local Repo for RHCE exam
+gpgcheck=0
+enabled=1
+baseurl=http://content.example.com/rhel7.0/x86_64/errara
 
