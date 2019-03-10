@@ -1,0 +1,781 @@
+Mounting with CIFS
+Most of everything is the same, except the syntax you use to actually mount the share.
+sudo mount -t cifs -o noperm //<IP Address>/<NameofShare> /mnt/<FolderyouCreated>
+
+Mounting with NFS
+
+sudo mount -t nfs <IP Address>:/<DriveVolumeName>/<NameofShare> /mnt/<FolderyouCreated>
+
+
+Packages to Install:
+
+1. Server - system 1
+ 
+yum groupinstall   (3)
+	web-server 
+	mariadb*
+	mariadb-client; 
+yum install (13)
+	unbound 
+	postfix 	(email services)
+	targetcli  (Isci storage)
+
+	openssh*
+	mod-wsgi 
+
+	nfs-utils 
+	samba* 
+	samba-client 
+
+	authconfig-gtk 
+	sssd 
+	krb5-workstation 
+
+	php 
+	php-mysql
+
+Start/Enable Services:
+
+Server - 
+
+systemctl start (14)
+
+	httpd (web-server)
+	mariadb 
+
+	unbound  (caching Nameserver - DNS)
+	postfix (email services)
+
+	target  (Isci storage)
+	iscsi (Isci initiator)
+	iscsid (Isci initiator)
+
+	sshd (ssh access)
+
+	nfs-secure-server 
+	nfs-server 
+	smb 
+	nmb (also run 'systemctl enable' for all of these)
+
+	
+	NetworkManager (network teaming)
+	
+	firewalld 
+	
+	
+	
+Firewall settings - use the GUI (way easier than memorizing the CLI commands) firewall-config and enable the following services and ports for Permanent...don't forget to restart the firewalld service after:
+- Applications > Sundry > Firewall (or firewall-config)
+- choose permananet configration
+- after change settings, reload filewalld : options→ Reload Firewalld
+
+Server
+  - Services: dns ssh http https nfs rpc-bind mountd samba mysql smtp   (10)
+  - Ports: 3260/tcp
+               8909/tcp
+Client
+  - no configuration needed
+
+From the lab:
+Important: Also add a checkmark in front of the vnc-server service. Failing to
+do so will lock out your graphical interface when you activate the firewall. If you do
+accidentally lock yourself out, recover by using ssh -X serverX firewall-config
+from your desktopX machine.
+
+
+
+
+
+Client - system 2
+
+yum install (7)
+	iscsi-initiator-utils 
+	samba-client 
+	cifs-utils 
+	authconfig-gtk 
+	sssd 
+	krb5-workstation 
+	mariadb*
+	postfix
+
+systemctl start (3)
+	iscsi (Isci initiator)
+	iscsid (Isci initiator)
+	nfs-secure 
+	postfix
+(also run 'systemctl enable' for all of these)
+
+Boot both systems to verify
+
+Question 1
+
+Configure your system to use a default repository:-
+A yum repository has been provided at
+http://server1.net13.example.com//rhel
+
+Ans:-
+
+#vim /etc/yum.repos.d/server.repo
+[server]
+name = Local Repo for RHCE exam
+gpgcheck=0
+enabled=1
+baseurl=http://content.example.com/rhel7.0/x86_64/errara
+yum clean all
+yum repolist   (all)
+
+
+Question 2.  setenforce Enforncing
+
+	vi /etc/sysconfig/selinux
+
+Question 3
+configure SSH access as follows:
+users have remote SSH access to your virtual systems from within
+group10.example.com
+client within my133t.org should not have access to ssh on your systems.
+a particular domain should access , some should not acccess to your system
+
+	echo "sshd: *.district.example.com" >>  /etc/hosts.allow
+	echo "sshd: *.my1234.org" >> /etc/hosts.deny
+
+Question 4.
+
+Port forwarding
+configure port forwarding in your machine system1 such that forward all
+incoming connection on port 5909/tcp
+on the firewall to port 80/tcp of the machine with the 172.26.1.0/24
+
+Ans:- 
+
+firewall-cmd –-permanent -–add-rich-rule ‘rule family=ipv4 source address=172.24.2.110/24 forward-port port=5243 protocol=tcp to-port=80’
+
+	firewall-cmd -reload
+	
+	firewall-cmd –-list-rich-rules
+
+
+Question 5
+
+create a custom command called qstat on both system1 and system2 that
+runs the command: /bin/ps -Ao pid,tt,user,fname,rsz
+this command should be available to all usres on the system.
+
+Ans:- #vim /etc/bashrc
+alias qstat="/bin/ps -Ao pid,tt,user,fname,rsz"
+
+source /etc/bashrc
+qstat
+
+#reboot
+
+
+Question 6. configure ipv6
+configure the eth0 on your exam system with the following ipv6 addresses
+system1 should have the address 200a:ac18::a05/64
+system2 should have the address 200a:ac18::a0a/64
+Ans:-
+
+(ON SYSTEM1)
+#nmcli con show
+#nmcli con mod "eth0" ipv6.addresses 200a:ac18::a05/64 ipv6.method manual connection.autoconnect yes
+
+nmcli con down eth0
+nmcli con up eth0
+#ping6 200a:ac18::a05
+
+(ON SYSTEM2)
+do the same as system 1
+
+Question 7. link aggrigation
+configure a network name link between system1.groupx.example.com and
+system2.groupx.example.com according to the following requirements
+the link uses the interfaces eth1 and eth2
+the link will continue to functions even if one of the underlying
+interfaces or network is down
+the link interface on system1 has the address 172.16.x.25/24
+the link interface on system2 has the address 172.16.x.25/24
+the link is active after a system reboot.
+
+nmcli con add type team con-name team0 ifname team0 config ‘{ “runner”:{“name” : “activebackup”}}’
+
+	nmcli con mod team0 ipv4.addresses ‘172.24.2.125/24’ ipv4.method manual connection.autoconnect yes
+
+
+	nmcli con add type team-slave con-name team0-slave1 ifname eno1 master team0
+
+	nmcli con add type team-slave con-name team0-slave2 ifname eno2 master team0
+
+	nmcli con up team0
+
+teamdctl team0 state
+#nmcli connection show
+#ping -I team1 172.16.10.25
+
+Question 8. MAIL service
+configure mail on both system1 and system2
+the system donot accpet incoming email from external resources
+any mail send locally on these system is automatically routed to
+server1.groupx.example.com 
+mail sent from these systems show up as coming from groupx.example.com
+you may test your configuration by sending eamil to the localuser arthur
++. the system server1.groupx.example.com has been configured drop email for
+this user into
+http://server1.groupx.example.com/recieved_mail/11
+
+Ans:- (Same thing on both systems SYSTEM1 and SYSTEM2)
+
+	yum -y install postfix 
+	systemctl enable postfix
+	systemctl start postfix
+	firewall-cmd –-permanent –-add-service=smtp 
+	firewall-cmd –-reload
+
+	vi //etc/postfix/main.conf?
+Remember 5 numbers
+
+:99
+myorigin = district.example.com (that is your domain – provided in paper)
+:116
+inet_interface = loopback-only
+:164
+mydestination = (remove everything)
+:264
+mynetworks =127.0.0.0/8 [::1]/128
+:317
+relayhost = [station.district.example.com] (put it in bracket)
+
+postconf -e "local_transport=error: local delivery disabled" (add to the end of file)
+
+systemctl restart postfix
+
+to verify:
+check email
+mail -s “test” clark@district.example.com (need to create user first)
+Hi clark,
+.
+EOT
+
+postqueue -p
+
+[student@serverX ~]$ mail -s "serverX null client" student@desktopX.example.com
+null client test
+.
+EOT (CTL+d)
+
+[student@serverX ~]$ mutt -f imaps://imapX.example.com
+Or on desktop cat /var/mail/student
+
+
+Question 9. Script
+create a script on system1 named /root/foo.sh that does the following
+when run as /root/foo.sh redhat it produces the output fedora on stdout
+when run as /root/foo.sh fedora it produces the output redhat on stdout
+when run without arguments or any other arguments other than redhat or
+fedora, it sends the following output to stderr:
+/root/foo.sh redhat|fedora
+
+Ans:- #vim /root/foo.sh
+#!/bin/bash
+if [ "$1" == "redhat" ]
+then
+echo "fedora"
+elif [ "$1" == "fedora" ]
+then
+echo "redhat"
+else
+echo "/root/foo.sh redhat|fedora"
+fi
+
+
+Question 9.a.
+
+Create a script name makeusers in /root directory 
+when an argument file.txt pass in front of this script then users listed in
+this file created with /bin/false sheel. 
+
+When file name is different then error shows file not found 
+
+if file is not pass an argument then error shows please write
+command again. 
+Download this file from http://classroom.example.com/pub/file.txt
+
+vi file.txt
+	sara
+	ken
+
+
+Ans:- #vim /root/makeusers
+#!/bin/bash
+if [ "$#" -lt 1 ]
+if [$# == 0]; then
+then
+echo "please write command again"
+exit 0
+fi
+if [ -f $1 ]
+then
+for users in `cat $1`
+for users in $(cat $1)
+do
+adduser -s /bin/false $users
+useradd -s /bin/false $users
+done
+else
+echo "file not found"
+fi
+
+
+Question 10. MARIADB
+create a mariadb database name contacts on system1 such that following
+condtions exist
+the database should contain the content of the database dump from
+http://server1.groupx.example.com/materials/users.mdb
+the database should be accessible from localhost only
+other than the root user, the database only allow queries from the user
+raikon. this user should have the password zaldebro
+the root user should have password zaldebro and must not be allowed to log
+in without using a password
+
+Ans:-
+(On system1)
+#yum -y groupinstall mariadb*
+#systemctl restart mariadb
+#systemctl enable mariadb
+#firewall-cmd --permanent --add-service=mysql
+#firewall-cmd --reload
+#mysql_secure_installation
+	set password - y
+	zaldebro
+#mysql -u root -p
+	/> create database contacts ;
+	/> show databases ;
+	/> flush privileges ;  //no need at ths point
+	/> exit;
+#wget http://server1.groupX.example.com/materials/users.mdb
+#wget http://classroom.example.com/pub/materials/mariadb/mariadb.dump
+mysql -u root -p contacts < /root/mariadb.dump
+#mysql -u root -p contacts <users.mdb
+Lab: mysql -u root legacy < /home/student/mariadb.dump
+#mysql -u root -p contacts
+/>create user raikon@'localhost' identified by 'zaldebro' ;
+/>grant update,insert,delete,select on contacts.* to raikon@'localhost' ;
+/>flush privileges;
+/>exit
+#vim /etc/my.cnf
+skip-networking=1
+#systemctl restart mariadb
+
+Question 11. Query database
+use the d atabase contacts on system1 and the appropriate sql queries to
+answer the following question
+what is the first name of person whose password is solicitous ?
+Ans:- (On system1)#mysql -u root -p contacts
+/> show tables;
+/> describe tablename ;
+/> select * from tablename where field_name='field_value' ;
+select user from user where password=PASSWORD(‘SOLICITOUS’);
+
+Question 12. ISCSI   (21 min)
+configure system1 to provide an iscsi disk device name iqn.2016-
+08.com.example.groupx:system1
+the iscsi service uses port 3260
+this target usasge 3G backing logical volume name iscsi_store
+the target is only available to system2.groupx.example.com only
+
+Ans:- ISCSI Server (On system1)
+# yum -y install targetcli*
+#systectl restart target
+#systemctl enable target
+#firewall-cmd --permanent --add-port=3260/tcp
+#firewall-cmd -reload
+#fdisk /dev/vda
+	n-new
+	0 0p-primary
+	+4G-size
+	t-type
+	8e-lvm hex code
+	w-write or save
+	#partprobe /dev/vda
+#pvcreate /dev/vda1
+#vgcreate myvol /dev/vda1
+#lvcreate -n mylv -L 3G myvol
+#lvdisplay
+#targetcli
+	- Configure the existing /dev/myvol/mylv logical volume as a block-type backing
+	store. 
+		/>backstores/block create iscsi_store /dev/myvol/mylv
+	- Create a unique iSCSI Qualified Name (IQN) for the target.
+		/>/iscsi create iqn.2016-08.com.example:server1
+	
+
+
+	- Create an ACL for the client node (initiator).
+	The initiator will be connecting with it's initiator name set to 
+	iqn.2014-06.com.example:desktopX.
+		/>/iscsi/iqn.2016-08.com.example.groupX:system1/tpg1/acls create
+			iqn.2016-08.com.example:desktop1
+
+	- Create a LUN under the target, the LUN should use the previously defined backing storage
+	device named serverX.disk1.
+		/>/iscsi/iqn.2016-08.com.example.groupX:system1/tpg1/luns create
+			/backstores/block/iscsi_store
+	- Configure a portal for the target to listen on 172.25.X.11, port 3260.
+		/>/iscsi/iqn.2016-08.com.example.groupX:system1/tpg1/portals create
+			172.24.X.30
+	- View and verify the configuration.
+		/>ls
+	- Exit and save the configuration to the default /etc/target/saveconfig.json.
+		/>saveconfig
+		/>exit
+#systemctl restart target
+
+Question 13. ISCSI INITIATOR   (20 min)
+configure system2 so that it connects to the iqn.2016-
+08.com.example.groupx:system1 as follows
+the iscsi device should automaticaly be available on system boot
+the iscsi block device contains a 2100MB partition that is formated as
+ext4
+the partition is mounted to /mnt/data and is automatically mounted to this
+directory
+
+Ans:- 
+#yum -y install iscsi-initiator-utils
+#vim /etc/iscsi/initiator.iscsi
+InitiatorName=iqn.2016-08.com.example.groupX:system2
+#systemctl restart iscsi (iscsid.service)
+#systemctl enable iscsi
+#iscsiadm -m discovery -t st -p 172.24.X.30:3260 -l
+(sudo iscsiadm -m discovery -t st -p serverX.example.com)
+iscsiadm -m node -T iqn.2017-04.com.example.district:system1 –portal 172.24.2.110:3260 -l (login to)
+(iscsiadm -m node -T iqn.2014-06.com.example:serverX -p 172.25.1.11 -l)
+To verify the device node for the iSCSI disk
+iscsiadm -m session -P3 | grep Attached 
+#lsblk
+#fdsik /dev/sda
+n
+p
++2100M
+w
+#partprobe /dev/sda
+#mkfs.ext4 /dev/sda1
+#blkid
+#mkdir /mnt/data
+#vim /etc/fstab
+/dev/sda1 /mnt/data ext4  _netdev 0 0
+#mount -a
+#df- h
+
+Question 14. SAMBA
+configure smb service on system1 as follows
+your smb server must be a member of the STAFF workgroup
+the service must share the /common directory. the share name must be
+common
+the common share must be available to groupx.example.com domain client only
+the common must be browseable
+the user floyd must have read access the share,authenticating with the
+password indionce if necessary.
+
+- yum -y install samba*
+- systemctl enable smb nmb
+- systemctl start smb nmb
+- firewall-cmd --permanent --add-service=samba
+- firewall-cmd  --reload 
+- mkdir //groupdir
+- getsebool -a |grep samba
+- setsebool -P samba_enable_home_dirs on
+- setsebool -P samba_export_all_ro on
+- setsebool -P samba_export_all_rw on
+- setsebool -P use_samba_home_dirs on
+- getsebool -a |grep samba (to check if they are on)
+- semanage fcontext -a -t samba_share_t ‘/groupdir(/.*)?’
+- restorecon -RFv /groupdir
+- Now the question will ask:
+	given a user name and user must have read access to a shared dir,  with  authentication password. The shared name (given by the exam) must be browsablevi 
+- setfacl -m u:barbet:rx /groupdir/
+- id barnaey
+- smbpasswd -a barney
+	#smppasswd -e floyd
+- vi /etc/samba/smb.conf
+# samba user must be a member of a staff group
+#shift+g to to to the end of the file, add the following content
+	workgroup = STAFF
+	[common]:
+	hosts allow = 172.24.
+	browseable = yes
+	valid users = barbey
+	read list = barney
+	path = /groupdir
+-  systemctl restart smb nmb
+- testparm ( to test if the config is taken)
+# check if user barney is getting access to samba or not (on system 2)
+- smbclient //172.24.2.110/common -U barney
+
+Question 15. MULTIuser SAMBA
+on system1 share the /devops directory via SMB as follows:
+1. the share should be named devops
+2. the devops share must only be available to clients in the groupx.example.com domain
+3. the devops share must be browseable
+4. kenji must have read access to share,authenticating with password indionce
+5. chihiro must have read and write access to the share, authenticating with the password indionce
+6. the smb share is permanently mounted on system2 at /mnt/dev using the
+7. credentials of kenji. the share must allow anyone who can
+authenticate as chihiro to temprary acquire write permission.
+
+Ans:- (on system1)
+	mkdir /devops
+- chmod 2775 /devops
+	#semanage fcontext -a -t samba_share_t '/devops(/.*)?'
+	#restorecon -vFR /devops
+
+#vim /etc/samba/smb.conf
+		[devops]:---------------------------------------------- sharing name
+		path = /devops :--------------------------------------directory name
+		valid users = kenji chihiro
+                        
+		write list = chihiro
+		browseable = yes
+		hosts allow = 172.25.1.10/24   (system 2 ip)
+	#useradd kenji
+	#useradd chihiro
+	#smbpasswd -a kenji
+	#smbpasswd -a chihiro
+	#smbpasswd -e kenji
+	#smbpasswd -e chihiro
+	#setfacl -m u:chihiro:rwx /devops
+#setfacl -m u:kenji:rx /devops
+- getsebool -a |grep sambal
+- setsebool -P samba_enable_home_dirs on
+- setsebool -P samba_export_all_ro on
+- setsebool -P samba_export_all_rw on
+- setsebool -P use_samba_home_dirs on
+- getsebool -a |grep samba (to check if they are on)
+	#sestatus -b |grep samba
+	#setsebool -P samba_enable__home_dirs on
+	#setsebool -P samba_export_all_rw on
+	#systemctl restart smb nmb
+- testparm
+(System2 Side)
+
+yum -y install cifs-utils samba-client
+	#mkdir /mnt/dev
+	#vim /root/file.txt
+		username=kenji
+		password=indionce
+	#vim /etc/fstab
+//system1/devops /mnt/dev cifs 			     defaults,multiuser,sec=ntlmssp,username=kenji,password=indionce
+//172.24.2.110/data 	/mnt/multi 	cifs 	credentials=/root/cred.txt,multiuser,sec=ntlmssp 0 0
+
+To test:
+smbclient //server1/devops -U kenji
+	#mount -a
+	#df -h
+Question 16. NFS-Server
+configure nfs on system1 as follows:
+1. export the /public directory with read only access to the groupx.example.com domain only
+2. export the /protected directory with read write access to the groupx.example.com
+3. access to /protected should be secure by kerbros. you can use keytab at
+http://host.groupx.example.com/materials/nfs_server.keytab
+4. the /protected directory should contain a sub-directory name project that
+is owned by krishna
+krishna should have read write access to /protected/project.
+
+ANs:- NFS (On server)smb
+	#yum -y install nfs*
+	#mkdir /public
+	#semanage fcontext -a -t public_content_t '/public(/.*)?'
+	#restorecon -vFR /public
+	#ls -ldZ /public
+	#vim /etc/exports
+		/public 172.25.X.0/24(ro)   (ip of server)
+	#systemctl restart nfs-server
+	#systemctl enable nfs-server
+	#firewall-cmd --permananet --add-service=nfs
+#firewall-cmd --complete-reload
+	#wget -O /etc/krb5.keytab http://host.groupX.example.com/materials/nfs_server.keytab
+	To use classroom vm:
+[student@desktopX ~]$ 
+sudo wget -O /etc/krb5.keytab http://classroom.example.com/pub/keytabs/server1.keytab
+#mkdir /protected
+	#cd /protected
+	#semanage fcontext -a -t public_content_rw_t '/protected(/.*)?'
+	#restorecon -vFR /protected
+	#vim /etc/sysconfig/nfs
+		RPCNFDRAGS= "-V 4.2"
+	#vim /etc/exports
+		/protected 172.25.X.0/24(rw,sync,sec=krb5p)
+	#mkdir /protected/project
+	#useradd krishna
+	#chown nfsnobody /protected
+	#chown krishna /protected/project
+	#setfacl -m u:krishna:rwx /protected/project
+	
+	#systemctl restart nfs-server
+	#systemctl restart nfs-secure-server
+	#systemctl enable nfs-secure-server
+	#firewall-cmd --permanent --add-service=nfs
+	#firewall-cmd --complete-reload
+	#firewall-cmd --permanenet --add-service=rpc-bind
+	#firewall-cmd --permanent --add-service=mountd
+
+
+Question 17. Mount an nfs share
+1. configure system2 to mount the following nfs share from
+system1.groupx.example.com
+2. /public should be mounted to /mnt/nfsmount
+3. /protected should be mounted to /mnt/nfssecure using the keytab at
+http://host.groupx.example.com/materials/nfs_client.keytab
+4. krishna should be able to create file in /mnt/nfssecure/project
+5. the file system should automatically be mounted at boot
+
+Ans:- Mount nfs
+(Client side) Untitled Folder 4
+	#yum -y install nfs-utils
+	#mkdir /mnt/nfsmount
+	#mkdir /mnt/nfs
+	#vim /etc/fstab
+		serverX:/public mnt/nfsmount nfs defaults 0 0
+	#mount -a
+	#df -h
+	#wget -O /etc/krb5.keytab http://host.groupX.example.com/materials/nfs_client.keytab
+	#mkdir /mnt/nfssecure
+	#vim /etc/fstab
+		system1:/protected /mnt/nfssecure	nfs	defaults,v4.2,sec=krb5p 0 0
+	#systemctl restart nfse-secure
+	#mount -a
+	#df -h
+
+
+Question 18.  Implement dynamic web content
+configure your webserver on system1 to provide dynamic web content as
+follows:
+1. dynamic content is provided by a virtual host named alt.groupx.example.com
+the virtual host listen on port 8909
+2. download a copy of script at http://server1.groupx.example.com/materials/webinfo.wsgi and place it in an appropriate location for your virtual host so that it genrate dynamic web content. 
+Do not alter or change the content of the file in any way
+3. clients connecting to http://alt.groupx.example.com:8909/ should receive a
+dynamicaly genrated webpage
+4. the location http://alt.groupx.example.com:8909 must be accessble to all
+system in the domain groupx.example.com
+
+Answer:
+
+#yum -y install httpd*
+#yum -y install mod_wsgi
+#wget http://server1.groupX.example.com/materials/webinfo.wsgi
+#mv webinfo.wsgi /var/www/html
+#restorecon -vvFR /var/www/html/webinfo.wsgi
+#vim /etc/httpd/conf.d/webinfo.conf
+	listen 8909
+ 	<virtualhost 172.25.0.11:8909>
+		servername alt.groupX.example.com
+		servername webapp0.example.com
+		wsgiscriptalias / /var/www/html/webinfo.wsgi
+	</virtualhost>
+	<directory /var/www/html>
+		Require all granted
+		order allow,deny
+		allow from 172.25.0.0/24   (system 2 ip)
+	</directory>
+
+#semanage port -a -t http_port_t -p tcp 8909
+#systemctl restart httpd
+#systemctl enable httpd
+#firewall-cmd --permanent --add-port=8909/tcp
+#firewall-cmd --complete-reload
+#firewall-cmd --permanent --add-service=http
+#firewall-cmd --complete-reload
+
+ON SYSTEM2
+#firefox http://alt.groupX.example.com:8909
+
+Question 19. Implement a web server
+implement a webserver on system1 for the site http://system1.groupx.example.com and perform the following steps
+1. download http://server1.groupx.example.com/materials/station.html
+2. rename the downloaded file to index.html do not make modification to the content of this file
+3. copy this index.html to the documentroot of your webserver
+4. clients within groupx.example.com should be able to access the webserver
+5. clients with in my133t.org should not have acces the webserver
+
+Ans:- (on system1)
+#wget http://server1.groupX.example.com/materials/station.html
+#mv station.html /var/www/html/index.html
+#restorecon -vvFR /var/www/html/index.html
+#ls -ldZ /var/www/html/index.html
+#vim /etc/httpd/conf.d/server.conf
+	<virtualhost 172.25.0.11:80>
+		servername system1.groupX.example.com
+		servername server0.example.com
+		documentroot /var/www/html
+	</virtualhost>
+	<directory /var/www/html>
+		order allow,deny
+		allow from 172.25.0.0/24
+	</directory>
+#systemctl restart httpd
+#systemctl enable httpd
+firewall-cmd --permanent --add-service=http
+firewall-cmd --complete-reload
+ON SYSTEM 2
+#firefox http://system1.groupX.example.com
+Question 20. configure a virtual host
+extend your webserver on system1 to inculde a virtualhost for the site
+http://www.groupx.example.com then perform the following step
+1. set the document root for the virtual host to /var/www/virtual
+2. download http://server1.groupx.example.com/materials/www.html
+rename the downloaded file index.html do not make any modification to the
+content of this file
+3. place this file in the document root of the virtual host
+4. the usr floyd must be able to create content in /var/www/virtual
+NOTE- the original webstie http://system1.groupx.example.com must still be
+accessible. dns resolution for the host name www.groupx.example.com
+is [kiosk@foundation0 Desktop] $ rht-vmctl view all
+allready provided by the name server groupx.example.com.
+
+Ans:-
+(on system1)
+#mkdir /var/www/virtual
+#wget http://server1.groupX.example.com/materials/www.html
+#mv www.html /var/www/virtual/index.html
+#restorecon -vvFR /var/www/virtual
+#restorecon -vvFR /var/www/virtual/index.html
+#ls -ldZ /var/www/virtual/index.html
+#vim /etc/httpd/conf.d/www.conf
+	<virtualhost 172.25.0.11:80>  
+		servername www0.example.com
+		documentroot /var/www/virtual
+	</virtualhost>
+	<directory /var/www/virtual>
+		require all granted
+	</directory>
+#setfacl -m u:floyd:rwx /var/www/virtual  //did not do this in the video
+#systemctl restart httpd
+
+ON SYSTEM 2
+#firefox http://www.groupX.example.com
+
+Question 21. Configure web content access
+1. on your webserver on system1 create directory name private under the
+document root directory and configure as follows:
+2. download a copy of the file http://server1.groupx.example.com/materials/private.html into this directory and
+3. rename it index.html do not make any modification to the content of this file.
+4. the contents of private should be visible to anyone browsing from system1
+(including localhost) but should not be accessible from other location
+
+Ans:- on system1
+#mkdir /var/www/html/private
+#wget http://server1.groupX.example.com/materials/private.html
+#mv private.html /var/www/html/private/index.html
+#restorecon -vvFR /var/www/html/private
+#restorecon -vvFR /var/www/html/private/index.html
+#ls -ldZ /var/www/html/index.html
+// add  the following to the same server.conf
+#vim /etc/httpd/conf.d/abc.conf
+	<directory /var/www/html/private>
+		order allow,deny
+		allow from 172.25.0.11 → the server0 ip (localhost)
+	</directory>
+#systemctl restart httpd
+#systemctl enable httpd
+ON SYSTEM 2
+#firefox http://system1.groupx.example.com/private
